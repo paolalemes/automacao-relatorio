@@ -111,7 +111,6 @@ def contador_regressivo(segundos, mensagem="⏳ Aguardando..."):
         time.sleep(1)
     contagem.markdown("✅ Tempo de espera finalizado.")
 
-@st.cache_data(show_spinner="🔄 Carregando dados V-tracker...")
 def gerar_dash_id(filtro, filtro_id, nome, max_tentativas=5, intervalo_entre_tentativas=120):
     for tentativa in range(1, max_tentativas + 1):
         url_gerar_dash = f"http://developers.vtracker.com.br/api/rest/graficos/gerarDash?key={chave}&monitoramentoId={monitoramentoId}&filtroId={filtro_id}"
@@ -566,154 +565,6 @@ def gerar_comparacao_quinzenal(df_americanas_atualizado, df_historico_mencoes):
 
     return df_total_comparacao_mencoes
 
-def gerar_graficos(df_mencoes_atualizado, df_resumo_todos, df_americanas_atualizado):
-    # Criar um dicionário para armazenar os arquivos de imagem dos gráficos
-    imagens = {}
-
-    # Garante datas como datetime
-    df_mencoes_atualizado['DATA'] = pd.to_datetime(df_mencoes_atualizado['DATA'])
-    df_americanas_atualizado['DATA'] = pd.to_datetime(df_americanas_atualizado['DATA'])
-
-    # === GRÁFICO 1: Últimos 15 dias (TOTAL DIA)
-    df_15_dias = df_mencoes_atualizado.sort_values('DATA').tail(15)
-    fig1 = plt.figure(figsize=(17.26, 2.846))
-    plt.fill_between(df_15_dias['DATA'], df_15_dias['TOTAL DIA'], color='#95B3D7')
-    plt.plot(df_15_dias['DATA'], df_15_dias['TOTAL DIA'], color='#95B3D7', linewidth=2)
-    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%Y'))
-    plt.xticks(rotation=45)
-    plt.grid(axis='y', linestyle='--')
-    plt.tight_layout()
-    buf1 = io.BytesIO()
-    fig1.savefig("grafico_1.png", dpi=300, bbox_inches='tight')
-    st.text('Volume de menções dos sócios nos ultimos 15 dias')
-    st.pyplot(fig1)
-    imagens['grafico_1.png'] = buf1.getvalue()
-    plt.close(fig1)
-
-    # === GRÁFICO 2: Últimos 3 meses (TOTAL DIA)
-    data_final = df_mencoes_atualizado['DATA'].max()
-    data_inicial = data_final - pd.DateOffset(months=3)
-    df_3_meses = df_mencoes_atualizado[
-        (df_mencoes_atualizado['DATA'] >= data_inicial) & (df_mencoes_atualizado['DATA'] <= data_final)
-    ]
-    fig2 = plt.figure(figsize=(17.26, 2.846))
-    plt.fill_between(df_3_meses['DATA'], df_3_meses['TOTAL DIA'], color='#95B3D7')
-    plt.plot(df_3_meses['DATA'], df_3_meses['TOTAL DIA'], color='#95B3D7', linewidth=2)
-    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%Y'))
-    plt.xticks(df_3_meses['DATA'][::2], rotation=45)
-    plt.grid(axis='y', linestyle='--')
-    plt.tight_layout()
-    buf2 = io.BytesIO()
-    fig2.savefig("grafico_2.png", dpi=300, bbox_inches='tight')
-    st.text('Volume de menções dos sócios nos ultimos 3 meses')
-    st.pyplot(fig2)
-    imagens['grafico_2.png'] = buf2.getvalue()
-    plt.close(fig2)
-
-    # === GRÁFICO 3: Pizza - Sócios
-    filtro = ['LEMANN - 90 DIAS', 'SICUPIRA - 90 DIAS', 'TELLES - 90 DIAS']
-    df_filtrado = df_resumo_todos[df_resumo_todos['NOME'].isin(filtro)]
-    valores = df_filtrado['TOTAL'].values
-    percentuais = ((valores / valores.sum()) * 100).round(0)
-    labels = ['Jorge Paulo Lemann', 'Carlos Alberto Sicupira', 'Marcel Telles']
-    colors = ['#0056A6', '#4CA64C', '#56B4E9']
-    fig3, ax = plt.subplots(figsize=(7.08, 7.28))
-    wedges, texts, autotexts = ax.pie(
-        percentuais,
-        colors=colors,
-        startangle=90,
-        wedgeprops={'width': 0.4, 'edgecolor': 'white'},
-        autopct='%1.1f%%'
-    )
-    centre_circle = plt.Circle((0, 0), 0.70, fc='white')
-    fig3.gca().add_artist(centre_circle)
-    for text in autotexts:
-        text.set_color('black')
-        text.set_fontsize(12)
-        text.set_weight('bold')
-    ax.set_title('Volume de Menções')
-    ax.axis('equal')
-    plt.legend(wedges, labels, loc="lower center", bbox_to_anchor=(1, 0))
-    plt.tight_layout()
-    buf3 = io.BytesIO()
-    fig3.savefig("grafico_3.png", dpi=300, bbox_inches='tight')
-    st.text('Distribuição do volume de menções dos sócios (%)')
-    st.pyplot(fig3)
-    imagens['grafico_3.png'] = buf3.getvalue()
-    plt.close(fig3)
-
-    # === GRÁFICO 4: Pizza - Empresas
-    empresas = ['BURGER KING', 'KRAFT HEINZ', '3G CAPITAL', 'AMBEV', 'FUNDAÇÃO LEMANN', 'AMERICANAS']
-    df_filtrado_empresas = df_resumo_todos[df_resumo_todos['NOME'].isin(empresas)].copy()
-    df_filtrado_empresas['PERCENTUAL'] = (df_filtrado_empresas['TOTAL'] / df_filtrado_empresas['TOTAL'].sum()) * 100
-    fig4, ax = plt.subplots(figsize=(8, 6))
-    wedges, texts = ax.pie(
-        df_filtrado_empresas['PERCENTUAL'],
-        colors=['#1f77b4', '#d62728', '#2ca02c', '#9467bd', '#17becf', '#ff7f0e'],
-        startangle=90,
-        counterclock=False,
-        wedgeprops={'width': 0.3}
-    )
-    labels_legenda = [
-        f"{nome}: {pct:.1f}%" for nome, pct in zip(df_filtrado_empresas['NOME'], df_filtrado_empresas['PERCENTUAL'])
-    ]
-    ax.legend(labels_legenda, title="Empresas", loc="center left", bbox_to_anchor=(1, 0.5))
-    plt.title('Volume de Menções')
-    plt.tight_layout()
-    buf4 = io.BytesIO()
-    fig4.savefig("grafico_4.png", dpi=300, bbox_inches='tight')
-    st.text('Distribuição do volume de menções das empresas (%)')
-    st.pyplot(fig4)
-    imagens['grafico_4.png'] = buf4.getvalue()
-    plt.close(fig4)
-
-    # === GRÁFICOS 5, 6, 7: Linhas por sócio
-    inicio_periodo = pd.Timestamp('2024-06-30')
-    df_filtrado_socio = df_mencoes_atualizado[df_mencoes_atualizado['DATA'] >= inicio_periodo]
-    socios = ['LEMANN', 'SICUPIRA', 'TELLES']
-    for socio in socios:
-        fig_socio = plt.figure(figsize=(16.71, 8.7))
-        plt.fill_between(df_filtrado_socio['DATA'], df_filtrado_socio[socio], color='#95B3D7')
-        plt.plot(df_filtrado_socio['DATA'], df_filtrado_socio[socio], color='#95B3D7', linewidth=2)
-        plt.grid(True, linestyle='--', alpha=0.5)
-        plt.gca().xaxis.set_major_locator(mdates.WeekdayLocator(interval=2))
-        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%y'))
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-        buf5 = io.BytesIO()
-        # fig_socio.savefig(f"grafico_mencoes_{socio}.png", dpi=300, bbox_inches='tight')
-        st.text(f'Volume de menções desde de 30 de Junho ({socio})')
-        st.pyplot(fig_socio)
-        imagens[f"grafico_mencoes_{socio}.png"] = buf5.getvalue()
-        plt.close(fig_socio)
-
-    # === GRÁFICO 8: Linhas Americanas
-    df_filtrado_am = df_americanas_atualizado[df_americanas_atualizado['DATA'] >= inicio_periodo]
-    fig8 = plt.figure(figsize=(16.71, 8.70))
-    plt.fill_between(df_filtrado_am['DATA'], df_filtrado_am['TOTAL'], color='#95B3D7')
-    plt.plot(df_filtrado_am['DATA'], df_filtrado_am['TOTAL'], color='#95B3D7', linewidth=2)
-    plt.grid(True, linestyle='--', alpha=0.5)
-    plt.gca().xaxis.set_major_locator(mdates.WeekdayLocator(interval=1))
-    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%y'))
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-    buf8 = io.BytesIO()
-    fig8.savefig("grafico_mencoes_americanas.png", dpi=300, bbox_inches='tight')
-    st.text(f'Volume de menções desde de 30 de Junho (Americanas)')
-    st.pyplot(fig8)
-    imagens['grafico_8.png'] = buf8.getvalue()
-    plt.close(fig8)
-
-    # Criar um arquivo ZIP na memória
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w") as zip_file:
-        for nome_arquivo, conteudo in imagens.items():
-            zip_file.writestr(nome_arquivo, conteudo)
-
-    zip_buffer.seek(0)
-
-    return zip_buffer
-
 def gerar_excel_multiplas_abas(df_resumo_todos, df_comparativo_alcance_todos, df_comparativo_mencoes_todos, df_comparacao):
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
@@ -796,6 +647,233 @@ def criar_zip_para_download():
     zip_excel.seek(0)
 
     return zip_excel
+
+def exibir_graficos(df_mencoes_atualizado, df_resumo_todos, df_americanas_atualizado):
+    df_mencoes_atualizado['DATA'] = pd.to_datetime(df_mencoes_atualizado['DATA'])
+    df_americanas_atualizado['DATA'] = pd.to_datetime(df_americanas_atualizado['DATA'])
+
+    # Gráfico 1 — Últimos 15 dias
+    df_15_dias = df_mencoes_atualizado.sort_values('DATA').tail(15)
+    fig1 = plt.figure(figsize=(17.26, 2.846))
+    plt.fill_between(df_15_dias['DATA'], df_15_dias['TOTAL DIA'], color='#95B3D7')
+    plt.plot(df_15_dias['DATA'], df_15_dias['TOTAL DIA'], color='#95B3D7', linewidth=2)
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%Y'))
+    plt.xticks(rotation=45)
+    plt.grid(axis='y', linestyle='--')
+    plt.tight_layout()
+    st.text('Volume de menções dos sócios nos últimos 15 dias')
+    st.pyplot(fig1)
+    plt.close(fig1)
+
+    # Gráfico 2 — Últimos 3 meses
+    data_final = df_mencoes_atualizado['DATA'].max()
+    data_inicial = data_final - pd.DateOffset(months=3)
+    df_3_meses = df_mencoes_atualizado[(df_mencoes_atualizado['DATA'] >= data_inicial)]
+    fig2 = plt.figure(figsize=(17.26, 2.846))
+    plt.fill_between(df_3_meses['DATA'], df_3_meses['TOTAL DIA'], color='#95B3D7')
+    plt.plot(df_3_meses['DATA'], df_3_meses['TOTAL DIA'], color='#95B3D7', linewidth=2)
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%Y'))
+    plt.xticks(df_3_meses['DATA'][::2], rotation=45)
+    plt.grid(axis='y', linestyle='--')
+    plt.tight_layout()
+    st.text('Volume de menções dos sócios nos últimos 3 meses')
+    st.pyplot(fig2)
+    plt.close(fig2)
+
+    # Gráfico 3 — Pizza sócios
+    filtro = ['LEMANN - 90 DIAS', 'SICUPIRA - 90 DIAS', 'TELLES - 90 DIAS']
+    df_socios = df_resumo_todos[df_resumo_todos['NOME'].isin(filtro)]
+    valores = df_socios['TOTAL'].values
+    percentuais = ((valores / valores.sum()) * 100).round(0)
+    labels = ['Jorge Paulo Lemann', 'Carlos Alberto Sicupira', 'Marcel Telles']
+    colors = ['#0056A6', '#4CA64C', '#56B4E9']
+    fig3, ax = plt.subplots(figsize=(7.08, 7.28))
+    wedges, texts, autotexts = ax.pie(
+        percentuais,
+        colors=colors,
+        startangle=90,
+        wedgeprops={'width': 0.4, 'edgecolor': 'white'},
+        autopct='%1.1f%%'
+    )
+    centre_circle = plt.Circle((0, 0), 0.70, fc='white')
+    fig3.gca().add_artist(centre_circle)
+    for text in autotexts:
+        text.set_color('black')
+        text.set_fontsize(12)
+        text.set_weight('bold')
+    ax.set_title('Volume de Menções')
+    ax.axis('equal')
+    plt.legend(wedges, labels, loc="lower center", bbox_to_anchor=(1, 0))
+    plt.tight_layout()
+    st.text('Distribuição do volume de menções dos sócios (%)')
+    st.pyplot(fig3)
+    plt.close(fig3)
+
+    # Gráfico 4 — Pizza empresas
+    empresas = ['BURGER KING', 'KRAFT HEINZ', '3G CAPITAL', 'AMBEV', 'FUNDAÇÃO LEMANN', 'AMERICANAS']
+    df_emp = df_resumo_todos[df_resumo_todos['NOME'].isin(empresas)].copy()
+    df_emp['PERCENTUAL'] = (df_emp['TOTAL'] / df_emp['TOTAL'].sum()) * 100
+    fig4, ax = plt.subplots(figsize=(8, 6))
+    wedges, texts = ax.pie(
+        df_emp['PERCENTUAL'],
+        colors=['#1f77b4', '#d62728', '#2ca02c', '#9467bd', '#17becf', '#ff7f0e'],
+        startangle=90,
+        counterclock=False,
+        wedgeprops={'width': 0.3}
+    )
+    labels_legenda = [f"{nome}: {pct:.1f}%" for nome, pct in zip(df_emp['NOME'], df_emp['PERCENTUAL'])]
+    ax.legend(labels_legenda, title="Empresas", loc="center left", bbox_to_anchor=(1, 0.5))
+    plt.title('Volume de Menções')
+    plt.tight_layout()
+    st.text('Distribuição do volume de menções das empresas (%)')
+    st.pyplot(fig4)
+    plt.close(fig4)
+
+    # Gráficos por sócio
+    inicio_periodo = pd.Timestamp('2024-06-30')
+    df_socios_mencoes = df_mencoes_atualizado[df_mencoes_atualizado['DATA'] >= inicio_periodo]
+    for socio in ['LEMANN', 'SICUPIRA', 'TELLES']:
+        fig = plt.figure(figsize=(16.71, 8.7))
+        plt.fill_between(df_socios_mencoes['DATA'], df_socios_mencoes[socio], color='#95B3D7')
+        plt.plot(df_socios_mencoes['DATA'], df_socios_mencoes[socio], color='#95B3D7', linewidth=2)
+        plt.grid(True, linestyle='--', alpha=0.5)
+        plt.gca().xaxis.set_major_locator(mdates.WeekdayLocator(interval=2))
+        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%y'))
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        st.text(f'Volume de menções desde 30 de Junho ({socio})')
+        st.pyplot(fig)
+        plt.close(fig)
+
+    # Gráfico Americanas
+    df_am = df_americanas_atualizado[df_americanas_atualizado['DATA'] >= inicio_periodo]
+    fig8 = plt.figure(figsize=(16.71, 8.7))
+    plt.fill_between(df_am['DATA'], df_am['TOTAL'], color='#95B3D7')
+    plt.plot(df_am['DATA'], df_am['TOTAL'], color='#95B3D7', linewidth=2)
+    plt.grid(True, linestyle='--', alpha=0.5)
+    plt.gca().xaxis.set_major_locator(mdates.WeekdayLocator(interval=1))
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%y'))
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    st.text('Volume de menções desde 30 de Junho (Americanas)')
+    st.pyplot(fig8)
+    plt.close(fig8)
+
+def gerar_zip_graficos(df_mencoes_atualizado, df_resumo_todos, df_americanas_atualizado):
+    df_mencoes_atualizado['DATA'] = pd.to_datetime(df_mencoes_atualizado['DATA'])
+    df_americanas_atualizado['DATA'] = pd.to_datetime(df_americanas_atualizado['DATA'])
+
+    imagens = {}
+
+    def salvar_fig(fig, nome):
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png', dpi=300, bbox_inches='tight')
+        buf.seek(0)
+        imagens[nome] = buf.read()
+        plt.close(fig)
+
+    # Gráfico 1 — Últimos 15 dias
+    df_15_dias = df_mencoes_atualizado.sort_values('DATA').tail(15)
+    fig1 = plt.figure(figsize=(17.26, 2.846))
+    plt.fill_between(df_15_dias['DATA'], df_15_dias['TOTAL DIA'], color='#95B3D7')
+    plt.plot(df_15_dias['DATA'], df_15_dias['TOTAL DIA'], color='#95B3D7', linewidth=2)
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%Y'))
+    plt.xticks(rotation=45)
+    plt.grid(axis='y', linestyle='--')
+    plt.tight_layout()
+    salvar_fig(fig1, 'grafico_1_ultimos_15_dias.png')
+
+    # Gráfico 2 — Últimos 3 meses
+    data_final = df_mencoes_atualizado['DATA'].max()
+    data_inicial = data_final - pd.DateOffset(months=3)
+    df_3_meses = df_mencoes_atualizado[df_mencoes_atualizado['DATA'] >= data_inicial]
+    fig2 = plt.figure(figsize=(17.26, 2.846))
+    plt.fill_between(df_3_meses['DATA'], df_3_meses['TOTAL DIA'], color='#95B3D7')
+    plt.plot(df_3_meses['DATA'], df_3_meses['TOTAL DIA'], color='#95B3D7', linewidth=2)
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%Y'))
+    plt.xticks(df_3_meses['DATA'][::2], rotation=45)
+    plt.grid(axis='y', linestyle='--')
+    plt.tight_layout()
+    salvar_fig(fig2, 'grafico_2_ultimos_3_meses.png')
+
+    # Gráfico 3 — Pizza sócios
+    filtro = ['LEMANN - 90 DIAS', 'SICUPIRA - 90 DIAS', 'TELLES - 90 DIAS']
+    df_socios = df_resumo_todos[df_resumo_todos['NOME'].isin(filtro)]
+    valores = df_socios['TOTAL'].values
+    percentuais = ((valores / valores.sum()) * 100).round(0)
+    labels = ['Jorge Paulo Lemann', 'Carlos Alberto Sicupira', 'Marcel Telles']
+    colors = ['#0056A6', '#4CA64C', '#56B4E9']
+    fig3, ax = plt.subplots(figsize=(7.08, 7.28))
+    wedges, texts, autotexts = ax.pie(
+        percentuais,
+        colors=colors,
+        startangle=90,
+        wedgeprops={'width': 0.4, 'edgecolor': 'white'},
+        autopct='%1.1f%%'
+    )
+    centre_circle = plt.Circle((0, 0), 0.70, fc='white')
+    fig3.gca().add_artist(centre_circle)
+    for text in autotexts:
+        text.set_color('black')
+        text.set_fontsize(12)
+        text.set_weight('bold')
+    ax.set_title('Volume de Menções')
+    ax.axis('equal')
+    plt.legend(wedges, labels, loc="lower center", bbox_to_anchor=(1, 0))
+    plt.tight_layout()
+    salvar_fig(fig3, 'grafico_3_pizza_socios.png')
+
+    # Gráfico 4 — Pizza empresas
+    empresas = ['BURGER KING', 'KRAFT HEINZ', '3G CAPITAL', 'AMBEV', 'FUNDAÇÃO LEMANN', 'AMERICANAS']
+    df_emp = df_resumo_todos[df_resumo_todos['NOME'].isin(empresas)].copy()
+    df_emp['PERCENTUAL'] = (df_emp['TOTAL'] / df_emp['TOTAL'].sum()) * 100
+    fig4, ax = plt.subplots(figsize=(8, 6))
+    wedges, texts = ax.pie(
+        df_emp['PERCENTUAL'],
+        colors=['#1f77b4', '#d62728', '#2ca02c', '#9467bd', '#17becf', '#ff7f0e'],
+        startangle=90,
+        counterclock=False,
+        wedgeprops={'width': 0.3}
+    )
+    labels_legenda = [f"{nome}: {pct:.1f}%" for nome, pct in zip(df_emp['NOME'], df_emp['PERCENTUAL'])]
+    ax.legend(labels_legenda, title="Empresas", loc="center left", bbox_to_anchor=(1, 0.5))
+    plt.title('Volume de Menções')
+    plt.tight_layout()
+    salvar_fig(fig4, 'grafico_4_pizza_empresas.png')
+
+    # Gráficos por sócio
+    inicio_periodo = pd.Timestamp('2024-06-30')
+    df_socios_mencoes = df_mencoes_atualizado[df_mencoes_atualizado['DATA'] >= inicio_periodo]
+    for socio in ['LEMANN', 'SICUPIRA', 'TELLES']:
+        fig = plt.figure(figsize=(16.71, 8.7))
+        plt.fill_between(df_socios_mencoes['DATA'], df_socios_mencoes[socio], color='#95B3D7')
+        plt.plot(df_socios_mencoes['DATA'], df_socios_mencoes[socio], color='#95B3D7', linewidth=2)
+        plt.grid(True, linestyle='--', alpha=0.5)
+        plt.gca().xaxis.set_major_locator(mdates.WeekdayLocator(interval=2))
+        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%y'))
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        salvar_fig(fig, f'grafico_{socio.lower()}.png')
+
+    # Gráfico final — Americanas
+    df_am = df_americanas_atualizado[df_americanas_atualizado['DATA'] >= inicio_periodo]
+    fig8 = plt.figure(figsize=(16.71, 8.7))
+    plt.fill_between(df_am['DATA'], df_am['TOTAL'], color='#95B3D7')
+    plt.plot(df_am['DATA'], df_am['TOTAL'], color='#95B3D7', linewidth=2)
+    plt.grid(True, linestyle='--', alpha=0.5)
+    plt.gca().xaxis.set_major_locator(mdates.WeekdayLocator(interval=1))
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%y'))
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    salvar_fig(fig8, 'grafico_americanas.png')
+
+    # Gerar ZIP
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w") as zip_file:
+        for nome_arquivo, conteudo in imagens.items():
+            zip_file.writestr(nome_arquivo, conteudo)
+    zip_buffer.seek(0)
+    return zip_buffer
 
 
 # ============================
@@ -900,16 +978,22 @@ if chave and username and password:
 
             # Gráficos
             st.header('📈 Gráficos')
-            zip_buffer = gerar_graficos(
+
+            exibir_graficos(
                 st.session_state.df_mencoes_atualizado,
                 st.session_state.df_resumo_todos,
                 st.session_state.df_americanas_atualizado
             )
 
 
-            # Downloads
+            zip_buffer = gerar_zip_graficos(
+                st.session_state.df_mencoes_atualizado,
+                st.session_state.df_resumo_todos,
+                st.session_state.df_americanas_atualizado
+            )
+
             st.download_button(
-                label="📊 Baixar todos os gráficos (.zip)",
+                label="📥 Baixar gráficos em ZIP",
                 data=zip_buffer,
                 file_name="graficos.zip",
                 mime="application/zip"
@@ -926,4 +1010,3 @@ if chave and username and password:
 
 else:
     st.warning("🔐 Por favor, insira chave, login e senha para continuar.")
-
